@@ -1,49 +1,128 @@
-import { API_CONFIG, MOCK_DATA } from './config.js';
+import { API_CONFIG, buildApiUrl, handleApiError } from './config.js';
 
 // ============================================
-// API FUNCTIONS (Mock implementations)
+// API FUNCTIONS (Real backend implementation)
 // ============================================
 export async function fetchCampaignDetail(contractAddress) {
-    // Mock API call - replace with real endpoint
-    // const response = await fetch(`${API_CONFIG.CAMPAIGN_DETAIL}/${contractAddress}?sequence=1`);
-    // return await response.json();
-
-    // Return mock data for now
-    return new Promise(resolve => {
-        setTimeout(() => resolve(MOCK_DATA.campaign), 500);
-    });
+    try {
+        const url = buildApiUrl(`${API_CONFIG.CAMPAIGN_DETAIL}/${contractAddress}`);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        handleApiError(error, 'fetchCampaignDetail');
+        throw error;
+    }
 }
 
 export async function fetchEscrowTransactions(escrowPublicKey) {
-    // Mock API call - replace with real endpoint
-    // const response = await fetch(`${API_CONFIG.ESCROW_TRANSACTIONS}/${escrowPublicKey}`);
-    // return await response.json();
-
-    return new Promise(resolve => {
-        setTimeout(() => resolve(MOCK_DATA.transactions), 300);
-    });
+    try {
+        const url = buildApiUrl(`${API_CONFIG.ESCROW_TRANSACTIONS}/${escrowPublicKey}`);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        handleApiError(error, 'fetchEscrowTransactions');
+        throw error;
+    }
 }
 
-export async function fetchEscrowBalance(escrowPublicKey, currentSOLPrice) {
-    // Mock API call - replace with real endpoint
-    // const response = await fetch(`${API_CONFIG.ESCROW_BALANCE}?wallet=${escrowPublicKey}`);
-    // return await response.json();
+export async function fetchEscrowBalance(escrowPublicKey) {
+    try {
+        const url = buildApiUrl(API_CONFIG.ESCROW_BALANCE, { wallet: escrowPublicKey });
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        handleApiError(error, 'fetchEscrowBalance');
+        throw error;
+    }
+}
 
-    return new Promise(resolve => {
-        // Simulate slight variations in balance for live effect
-        const mockBalance = { ...MOCK_DATA.escrowBalance };
-        mockBalance.data.balanceSOL += (Math.random() - 0.5) * 0.001;
-        mockBalance.data.balanceUSD = mockBalance.data.balanceSOL * currentSOLPrice;
-        setTimeout(() => resolve(mockBalance), 200);
-    });
+export async function fetchTokenInfo(contractAddress) {
+    try {
+        const url = buildApiUrl(`${API_CONFIG.TOKEN_INFO}/${contractAddress}`);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        handleApiError(error, 'fetchTokenInfo');
+        throw error;
+    }
+}
+
+export async function fetchCampaignQR(campaignId, amount = null) {
+    try {
+        const params = {};
+        if (amount !== null) {
+            params.amount = amount;
+        }
+        
+        const url = buildApiUrl(`${API_CONFIG.CAMPAIGN_QR}/${campaignId}/qr`, params);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        handleApiError(error, 'fetchCampaignQR');
+        throw error;
+    }
+}
+
+export async function fetchHealthCheck() {
+    try {
+        const url = buildApiUrl(API_CONFIG.HEALTH_CHECK);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        handleApiError(error, 'fetchHealthCheck');
+        throw error;
+    }
 }
 
 export async function fetchPairData(tokenAddress) {
-    // Mock API call - replace with real endpoint
-    // const response = await fetch(`${API_CONFIG.DEXSCREENER_API}/${tokenAddress}`);
-    // return await response.json();
-
-    return new Promise(resolve => {
-        setTimeout(() => resolve({ pairs: [] }), 400);
-    });
+    try {
+        const url = buildApiUrl(API_CONFIG.DEXSCREENER_API, { token: tokenAddress });
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        handleApiError(error, 'fetchPairData');
+        throw error;
+    }
 }

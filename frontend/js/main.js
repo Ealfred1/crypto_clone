@@ -1,61 +1,77 @@
 import { getContractAddressFromURL, updateCurrentTime } from './utils.js';
-import { fetchCampaignDetail, fetchEscrowTransactions, fetchEscrowBalance } from './api.js';
 import { renderCampaignHeader, renderProgress, renderContributions, renderCampaignStats, renderEscrowWallet } from './render.js';
 import { initTheme, toggleTheme } from './theme.js';
-import { MOCK_DATA } from './config.js';
+import { appState } from './state.js';
 
 // ============================================
-// GLOBAL STATE
+// GLOBAL STATE MANAGEMENT
 // ============================================
-let currentCampaign = MOCK_DATA.campaign.campaign;
-let currentContractAddress = MOCK_DATA.campaign.campaign.contract_address;
-let currentSOLPrice = 180; // Mock SOL price
-let pollingInterval = null;
+let currentSOLPrice = 180; // Default SOL price, will be updated from health check
 
 // ============================================
 // MAIN FUNCTIONS
 // ============================================
 async function loadCampaignData() {
     try {
-        const contractAddress = currentContractAddress;
+        console.log('🚀 Starting campaign data load...');
+        
+        // Test basic API connection first
+        try {
+            const response = await fetch('https://2ebb6db71568.ngrok-free.app/');
+            const data = await response.text();
+            console.log('✅ Basic API connection successful:', data);
+        } catch (error) {
+            console.warn('⚠️ Basic API connection failed:', error.message);
+        }
+        
+        let contractAddress = getContractAddressFromURL();
+        
+        // If no contract address in URL, try to get one from health check
         if (!contractAddress) {
-            throw new Error('No contract address found in URL');
+            console.log('No contract address found in URL, checking health check for available campaigns...');
+            
+            try {
+                const healthResponse = await fetch('https://2ebb6db71568.ngrok-free.app/api/health');
+                const healthData = await healthResponse.json();
+                
+                if (healthData.campaign_status && healthData.campaign_status.campaigns.length > 0) {
+                    // Use the first available campaign's wallet address as contract address
+                    const campaign = healthData.campaign_status.campaigns[0];
+                    contractAddress = campaign.wallet_address;
+                    console.log('Found campaign from health check:', campaign.campaign_id);
+                } else {
+                    // Fallback to default
+                    contractAddress = 'FuXL5ZYZc6YBGkRxWQ98k1f64QSGWXtLwNN2Dj5f3XYf';
+                    console.log('No campaigns in health check, using default wallet address');
+                }
+            } catch (error) {
+                console.warn('Health check failed, using default wallet address:', error.message);
+                contractAddress = 'FuXL5ZYZc6YBGkRxWQ98k1f64QSGWXtLwNN2Dj5f3XYf';
+            }
+            
+            // Update the URL to show the contract address
+            window.location.hash = `/coin/${contractAddress}`;
         }
 
-        currentContractAddress = contractAddress;
+        console.log('Loading campaign data for contract:', contractAddress);
 
-        // Fetch campaign details
-        const campaignData = MOCK_DATA.campaign; // Replace with fetchCampaignDetail(contractAddress) when backend is ready 
-        console.log('Loaded campaign data:', campaignData);
-        if (!campaignData.success) {
-            throw new Error('Failed to load campaign data');
-        }
-
-
-        // Fetch transactions
-        const transactionsData = MOCK_DATA.transactions;
-
-        // Render all components
-        renderCampaignHeader(currentCampaign);
-        renderProgress(currentCampaign, currentSOLPrice);
-        renderContributions(transactionsData);
-        renderCampaignStats(currentCampaign, transactionsData, currentSOLPrice);
-        renderEscrowWallet(currentCampaign);
-
+        // Initialize state with contract address
+        await appState.initialize(contractAddress);
+        
+        // Subscribe to state changes
+        appState.subscribe(handleStateChange);
+        
         // Show main content, hide loading
         document.getElementById('loadingState').classList.add('hidden');
         document.getElementById('mainContent').classList.remove('hidden');
-
-        // Start polling for balance updates
-        startPolling();
 
     } catch (error) {
         console.error('Error loading campaign data:', error);
         document.getElementById('loadingState').innerHTML = `
             <div class="text-center">
-                <div class="text-red-600 dark:text-red-400 text-lg mb-4">Error loading campaign</div>
+                <div class="text-red-600 dark:text-gray-400 text-lg mb-4">Error loading campaign</div>
                 <p class="text-gray-600 dark:text-gray-400">${error.message}</p>
-                <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                <button onclick="retryLoad()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
                     Retry
                 </button>
             </div>
@@ -63,51 +79,96 @@ async function loadCampaignData() {
     }
 }
 
-async function updateEscrowBalance() {
-    if (!currentCampaign) return;
-
-    try {
-        const balanceData = MOCK_DATA.escrowBalance;
-        if (balanceData.success) {
-            // Update current balance in campaign object
-            currentCampaign.current_balance = balanceData.data.balanceUSD;
-
-            // Re-render progress
-            renderProgress(currentCampaign, currentSOLPrice);
+// Handle state changes from the state management system
+function handleStateChange(state) {
+    if (state.error) {
+        showError(state.error);
+        return;
+    }
+    
+    if (state.isLoading) {
+        showLoading();
+        return;
+    }
+    
+    if (state.currentCampaign && state.transactionsData) {
+        // Render all components with fresh data
+        renderCampaignHeader(state.currentCampaign);
+        renderProgress(state.currentCampaign, currentSOLPrice);
+        renderContributions(state.transactionsData);
+        renderCampaignStats(state.currentCampaign, state.transactionsData, currentSOLPrice);
+        renderEscrowWallet(state.currentCampaign);
+        
+        // Update last updated timestamp if available
+        if (state.lastUpdated) {
+            updateLastUpdatedDisplay(state.lastUpdated);
         }
-    } catch (error) {
-        console.error('Error updating escrow balance:', error);
     }
 }
 
-function startPolling() {
-    // Poll escrow balance every 10 seconds
-    pollingInterval = setInterval(updateEscrowBalance, 10000);
+function showError(errorMessage) {
+    document.getElementById('loadingState').innerHTML = `
+        <div class="text-center">
+            <div class="text-red-600 dark:text-red-400 text-lg mb-4">Error</div>
+            <p class="text-gray-600 dark:text-gray-400">${errorMessage}</p>
+            <button onclick="retryLoad()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                Retry
+            </button>
+        </div>
+    `;
+    document.getElementById('loadingState').classList.remove('hidden');
+    document.getElementById('mainContent').classList.add('hidden');
 }
 
-function stopPolling() {
-    if (pollingInterval) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
+function showLoading() {
+    document.getElementById('loadingState').classList.remove('hidden');
+    document.getElementById('mainContent').classList.add('hidden');
+}
+
+function updateLastUpdatedDisplay(timestamp) {
+    const lastUpdatedElement = document.getElementById('lastUpdated');
+    if (lastUpdatedElement) {
+        const date = new Date(timestamp);
+        lastUpdatedElement.textContent = `Last updated: ${date.toLocaleTimeString()}`;
+    }
+}
+
+async function retryLoad() {
+    try {
+        const contractAddress = getContractAddressFromURL();
+        if (contractAddress) {
+            await appState.initialize(contractAddress);
+        }
+    } catch (error) {
+        showError(error.message);
     }
 }
 
 async function refreshContributions() {
-    if (!currentCampaign) return;
+    if (appState.getState().currentCampaign) {
+        await appState.refreshData();
+    }
+}
 
+async function updateSOLPrice() {
     try {
-        const transactionsData = MOCK_DATA.transactions;
-        renderContributions(transactionsData);
-        renderCampaignStats(currentCampaign, transactionsData, currentSOLPrice);
+        const { fetchHealthCheck } = await import('./api.js');
+        const healthData = await fetchHealthCheck();
+        if (healthData.sol_price) {
+            currentSOLPrice = healthData.sol_price;
+            console.log('SOL price updated:', currentSOLPrice);
+        }
     } catch (error) {
-        console.error('Error refreshing contributions:', error);
+        console.warn('Failed to update SOL price from health check, using default:', error.message);
+        // Keep using the default price if health check fails
+        currentSOLPrice = 180;
     }
 }
 
 // ============================================
 // INITIALIZATION
 // ============================================
-function init() {
+async function init() {
     // Initialize theme
     initTheme();
 
@@ -115,8 +176,12 @@ function init() {
     updateCurrentTime();
     setInterval(updateCurrentTime, 1000);
 
+    // Update SOL price from health check
+    await updateSOLPrice();
+    setInterval(updateSOLPrice, 60000); // Update every minute
+
     // Load campaign data
-    loadCampaignData();
+    await loadCampaignData();
 }
 
 // ============================================
@@ -138,15 +203,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Clean up polling when page is unloaded
-window.addEventListener('beforeunload', stopPolling);
+// Clean up state when page is unloaded
+window.addEventListener('beforeunload', () => {
+    appState.cleanup();
+});
 
 // Handle visibility change to pause/resume polling
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-        stopPolling();
-    } else if (currentCampaign) {
-        startPolling();
+        appState.stopPolling();
+    } else if (appState.getState().currentCampaign) {
+        appState.startPolling();
     }
 });
 
@@ -162,8 +229,11 @@ window.copyToClipboard = (elementId) => {
         }, 1000);
     });
 };
+
 window.openExplorer = () => {
     const escrowAddress = document.getElementById('escrowAddress').textContent;
     window.open(`https://solscan.io/account/${escrowAddress}`, '_blank');
 };
+
 window.refreshContributions = refreshContributions;
+window.retryLoad = retryLoad;

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DexVault API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: white; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .test-section { background: #2a2a2a; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .log { background: #333; padding: 10px; margin: 10px 0; border-radius: 5px; font-family: monospace; }
+        .error { background: #4a1a1a; color: #ff6b6b; }
+        .success { background: #1a4a1a; color: #6bff6b; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #4a90e2; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #357abd; }
+        .campaign-card { background: #333; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        input { padding: 8px; margin: 5px; background: #444; color: white; border: 1px solid #555; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 DexVault API Test Tool</h1>
+        
+        <div class="test-section">
+            <h2>📡 API Connection Test</h2>
+            <button onclick="testBasicConnection()">Test Root Endpoint</button>
+            <button onclick="testHealthCheck()">Test Health Check</button>
+            <div id="connectionLogs"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📊 Campaign Data Test</h2>
+            <input type="text" id="contractAddress" placeholder="Enter contract address" value="5LKmh8SLt4FkbddUhLHWP1ufsvdcBAovkH1Gyaw5pump">
+            <button onclick="testCampaignDetail()">Test Campaign Detail</button>
+            <button onclick="testWithRealCampaign()">Test with Real Campaign</button>
+            <div id="campaignLogs"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>💰 Escrow Data Test</h2>
+            <input type="text" id="walletAddress" placeholder="Enter wallet address" value="FuXL5ZYZc6YBGkRxWQ98k1f64QSGWXtLwNN2Dj5f3XYf">
+            <button onclick="testEscrowTransactions()">Test Escrow Transactions</button>
+            <button onclick="testEscrowBalance()">Test Escrow Balance</button>
+            <div id="escrowLogs"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎯 Frontend Integration Test</h2>
+            <button onclick="testFrontendIntegration()">Test Frontend Integration</button>
+            <button onclick="clearAllLogs()">Clear All Logs</button>
+            <div id="frontendLogs"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        const API_BASE = 'https://2ebb6db71568.ngrok-free.app';
+        
+        function log(message, type = 'info', targetId = 'connectionLogs') {
+            const logsDiv = document.getElementById(targetId);
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            logsDiv.appendChild(logDiv);
+            console.log(message);
+        }
+        
+        async function testBasicConnection() {
+            log('🧪 Testing basic connection to root endpoint...');
+            try {
+                const response = await fetch(API_BASE + '/');
+                const data = await response.text();
+                log(`✅ Root endpoint response (${response.status}): ${data}`, 'success');
+            } catch (error) {
+                log(`❌ Root endpoint failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testHealthCheck() {
+            log('🏥 Testing health check endpoint...');
+            try {
+                const response = await fetch(API_BASE + '/api/health');
+                const data = await response.text();
+                log(`✅ Health check response (${response.status}): ${data}`, 'success');
+                
+                // Parse and show campaign info
+                try {
+                    const healthData = JSON.parse(data);
+                    if (healthData.campaign_status && healthData.campaign_status.campaigns) {
+                        log(`📋 Found ${healthData.campaign_status.campaigns.length} campaigns:`, 'success');
+                        healthData.campaign_status.campaigns.forEach((campaign, index) => {
+                            log(`   Campaign ${index + 1}: ${campaign.campaign_id} - ${campaign.description}`, 'success');
+                        });
+                    }
+                } catch (e) {
+                    log(`⚠️ Could not parse health data: ${e.message}`);
+                }
+            } catch (error) {
+                log(`❌ Health check failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCampaignDetail() {
+            const contractAddress = document.getElementById('contractAddress').value;
+            log(`📊 Testing campaign detail for: ${contractAddress}`, 'info', 'campaignLogs');
+            try {
+                const response = await fetch(API_BASE + `/api/campaign-detail/${contractAddress}`);
+                const data = await response.text();
+                if (response.status === 200) {
+                    log(`✅ Campaign detail response: ${data}`, 'success', 'campaignLogs');
+                } else {
+                    log(`❌ Campaign detail failed (${response.status}): ${data}`, 'error', 'campaignLogs');
+                }
+            } catch (error) {
+                log(`❌ Campaign detail failed: ${error.message}`, 'error', 'campaignLogs');
+            }
+        }
+        
+        async function testWithRealCampaign() {
+            log('🎯 Testing with real campaign from health check...', 'info', 'campaignLogs');
+            try {
+                const healthResponse = await fetch(API_BASE + '/api/health');
+                const healthData = JSON.parse(await healthResponse.text());
+                
+                if (healthData.campaign_status && healthData.campaign_status.campaigns.length > 0) {
+                    const campaign = healthData.campaign_status.campaigns[0];
+                    log(`📋 Using campaign: ${campaign.campaign_id}`, 'success', 'campaignLogs');
+                    
+                    // Test escrow transactions
+                    const txResponse = await fetch(API_BASE + `/api/escrow-transactions/${campaign.wallet_address}`);
+                    const txData = await txResponse.text();
+                    log(`💰 Escrow transactions: ${txData}`, 'success', 'campaignLogs');
+                } else {
+                    log('❌ No campaigns found in health check', 'error', 'campaignLogs');
+                }
+            } catch (error) {
+                log(`❌ Real campaign test failed: ${error.message}`, 'error', 'campaignLogs');
+            }
+        }
+        
+        async function testEscrowTransactions() {
+            const walletAddress = document.getElementById('walletAddress').value;
+            log(`💰 Testing escrow transactions for: ${walletAddress}`, 'info', 'escrowLogs');
+            try {
+                const response = await fetch(API_BASE + `/api/escrow-transactions/${walletAddress}`);
+                const data = await response.text();
+                log(`✅ Escrow transactions: ${data}`, 'success', 'escrowLogs');
+            } catch (error) {
+                log(`❌ Escrow transactions failed: ${error.message}`, 'error', 'escrowLogs');
+            }
+        }
+        
+        async function testEscrowBalance() {
+            const walletAddress = document.getElementById('walletAddress').value;
+            log(`💰 Testing escrow balance for: ${walletAddress}`, 'info', 'escrowLogs');
+            try {
+                const response = await fetch(API_BASE + `/api/escrow-balance?wallet=${walletAddress}`);
+                const data = await response.text();
+                log(`✅ Escrow balance: ${data}`, 'success', 'escrowLogs');
+            } catch (error) {
+                log(`❌ Escrow balance failed: ${error.message}`, 'error', 'escrowLogs');
+            }
+        }
+        
+        async function testFrontendIntegration() {
+            log('🎨 Testing frontend integration...', 'info', 'frontendLogs');
+            try {
+                // Test if the main app can load
+                const testUrl = window.location.origin + '/#/coin/FuXL5ZYZc6YBGkRxWQ98k1f64QSGWXtLwNN2Dj5f3XYf';
+                log(`🔗 Test URL: ${testUrl}`, 'info', 'frontendLogs');
+                log('📱 Open this URL in a new tab to test the main app', 'success', 'frontendLogs');
+                
+                // Test API config
+                log('⚙️ API Configuration:', 'info', 'frontendLogs');
+                log(`   Base URL: ${API_BASE}`, 'info', 'frontendLogs');
+                log(`   Health Check: ${API_BASE}/api/health`, 'info', 'frontendLogs');
+                log(`   Campaign Detail: ${API_BASE}/api/campaign-detail/{address}`, 'info', 'frontendLogs');
+                
+            } catch (error) {
+                log(`❌ Frontend integration test failed: ${error.message}`, 'error', 'frontendLogs');
+            }
+        }
+        
+        function clearAllLogs() {
+            ['connectionLogs', 'campaignLogs', 'escrowLogs', 'frontendLogs'].forEach(id => {
+                document.getElementById(id).innerHTML = '';
+            });
+        }
+        
+        // Expose functions globally
+        window.testBasicConnection = testBasicConnection;
+        window.testHealthCheck = testHealthCheck;
+        window.testCampaignDetail = testCampaignDetail;
+        window.testWithRealCampaign = testWithRealCampaign;
+        window.testEscrowTransactions = testEscrowTransactions;
+        window.testEscrowBalance = testEscrowBalance;
+        window.testFrontendIntegration = testFrontendIntegration;
+        window.clearAllLogs = clearAllLogs;
+        
+        // Auto-test on load
+        log('🚀 Test tool loaded. Click buttons to test API endpoints.');
+        setTimeout(() => {
+            testBasicConnection();
+            testHealthCheck();
+        }, 1000);
+    </script>
+</body>
+</html>

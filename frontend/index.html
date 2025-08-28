@@ -165,12 +165,25 @@
     <!-- Main Content -->
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Loading State -->
-        <div id="loadingState" class="flex items-center justify-center min-h-[400px]">
-            <div class="text-center">
-                <svg class="h-12 w-12 mx-auto mb-6 text-blue-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-                </svg>
-                <p class="text-gray-600 dark:text-gray-300 text-lg">Loading campaign information...</p>
+        <div id="loadingState" class="text-center py-20">
+            <svg class="h-12 w-12 mx-auto mb-6 text-blue-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+            </svg>
+            <p class="text-gray-600 dark:text-gray-300 text-lg">Loading campaign information...</p>
+            
+            <!-- Test Links -->
+            <div class="mt-8 space-y-4">
+                <p class="text-gray-500 dark:text-gray-400 text-sm">Test with these campaigns:</p>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <a href="#/coin/5LKmh8SLt4FkbddUhLHWP1ufsvdcBAovkH1Gyaw5pump" 
+                       class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                        🚀 Karen Campaign
+                    </a>
+                    <a href="#/coin/7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU" 
+                       class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        🌟 Sample Campaign
+                    </a>
+                </div>
             </div>
         </div>
 
@@ -184,6 +197,11 @@
                     </svg>
                     Back to Campaigns
                 </a>
+            </div>
+
+            <!-- Last Updated Display -->
+            <div class="mb-4 text-right">
+                <span id="lastUpdated" class="text-sm text-gray-500 dark:text-gray-400">Last updated: --</span>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
